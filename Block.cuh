@@ -14,15 +14,18 @@ class Block {
         string sPrevHash;
 
         Block (uint32_t nIndexIn, const string &sDataIn);
-        __device__ void MineBlock(uint32_t nDifficulty);
+        void MineBlock(uint32_t nDifficulty);
 
     private:
         uint32_t _nIndex;
-        uint32_t _nNonce;
+        uint32_t* _nNonce;
         string _sData;
         time_t _tTime;
 
-        __device__ string _CalculateHash() const;
+        __device__ char* _CalculateHash() const;
+        __device__ bool _IsValidHash(const char* hash, uint32_t nDifficulty) const;
 };
+
+__global__ void mineblock(uint32_t nDifficulty, uint32_t* nNonce, char* sHash, uint32_t index, time_t tTime, const char* sPrevHash, const char* sData);
 
 #endif //BLOCK_CUH
