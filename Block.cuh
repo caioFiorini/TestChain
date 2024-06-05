@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <sstream>
+#include <cuda_runtime.h>
 
 using namespace std;
 
@@ -13,7 +14,7 @@ class Block {
         string sPrevHash;
 
         Block (uint32_t nIndexIn, const string &sDataIn);
-        void MineBlock(uint32_t nDifficulty);
+        __device__ void MineBlock(uint32_t nDifficulty);
 
     private:
         uint32_t _nIndex;
@@ -21,7 +22,7 @@ class Block {
         string _sData;
         time_t _tTime;
 
-        string _CalculateHash() const;
+        __device__ string _CalculateHash() const;
 };
 
 #endif //BLOCK_CUH

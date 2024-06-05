@@ -9,7 +9,7 @@ Block::Block(uint32_t nIndexIn, const string &sDataIn) : _nIndex(nIndexIn), _sDa
     sHash = _CalculateHash();
 }
 
-__global__ void mineblock(uint32_t nDifficulty, uint32_t* _nNonce, char* sHash)
+__device__ void Block::MineBlock(uint32_t nDifficulty)
 {
     char cstr[nDifficulty + 1];
     for (uint32_t i = 0; i < nDifficulty; ++i)
@@ -22,9 +22,11 @@ __global__ void mineblock(uint32_t nDifficulty, uint32_t* _nNonce, char* sHash)
 
     do
     {
-        _nNonce++; // variável da CPU.
-        sHash = _CalculateHash(); //variável compartilhada com a CPU.
-    } while (sHash.substr(0, nDifficulty) != str);
+        _nNonce++;
+        sHash = _CalculateHash();
+    }while (sHash.substr(0, nDifficulty) != str);
+
+    cout << "Block mined: " << sHash << endl;
 }
 
 //posso paralelizar essa parte do código.
@@ -47,7 +49,7 @@ void Block::MineBlock(uint32_t nDifficulty)
     cout << "Block mined: " << sHash << endl;
 }
 
-inline string Block::_CalculateHash() const
+__device__ char* Block::_CalculateHash() const
 {
     stringstream ss;
     ss << _nIndex << sPrevHash << _tTime << _sData << _nNonce;

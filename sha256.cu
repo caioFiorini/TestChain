@@ -23,7 +23,7 @@ const unsigned int SHA256::sha256_k[64] = //UL = uint32
 };
 
 // possível potêncial paralelo
-void SHA256::transform(const unsigned char *message, unsigned int block_nb)
+__device__ void SHA256::transform(const unsigned char *message, unsigned int block_nb)
 {
     uint32 w[64];
     uint32 wv[8];
@@ -62,7 +62,7 @@ void SHA256::transform(const unsigned char *message, unsigned int block_nb)
     }
 }
 
-void SHA256::init()
+__host__ void SHA256::init()
 {
     m_h[0] = 0x6a09e667;
     m_h[1] = 0xbb67ae85;
@@ -76,7 +76,7 @@ void SHA256::init()
     m_tot_len = 0;
 }
 
-void SHA256::update(const unsigned char *message, unsigned int len)
+__device__ void SHA256::update(const unsigned char *message, unsigned int len)
 {
     unsigned int block_nb;
     unsigned int new_len, rem_len, tmp_len;
@@ -98,7 +98,7 @@ void SHA256::update(const unsigned char *message, unsigned int len)
     m_tot_len += (block_nb + 1) << 6;
 }
 
-void SHA256::final(unsigned char *digest)
+__ host__ void SHA256::final(unsigned char *digest)
 {
     unsigned int block_nb;
     unsigned int pm_len;
@@ -115,18 +115,34 @@ void SHA256::final(unsigned char *digest)
     }
 }
 
+__global__ void sha256_cuda(const unsigned char *input, unsigned int length, unsigned char *output)
+{
+    SHA256 ctx;
+    ctx.init();;
+    ctx.update(input, length);
+    ctx.final(output);
+}
+
 string sha256(string input)
 {
+    const unsigned int length = input.size();
+    unsigned char *d_input, *d_output;
     unsigned char digest[SHA256::DIGEST_SIZE];
-    memset(digest,0,SHA256::DIGEST_SIZE);
-    SHA256 ctx = SHA256();
-    ctx.init();
-    ctx.update((unsigned char*)input.c_str(), input.length());
-    ctx.final(digest);
 
-    char buf[2*SHA256::DIGEST_SIZE+1];
-    buf[2*SHA256::DIGEST_SIZE] = 0;
-    for (int i = 0; i < SHA256::DIGEST_SIZE; i++)
-        sprintf(buf+i*2, "%02x", digest[i]);
-    return string(buf);
+    cudaMalloc((void**)&d_input, length * sizeof(unsigned char));
+    cudaMalloc((void**)&d_output, SHA256::DIGEST_SIZE * sizeof(unsigned char));
+    cudaMemcpy(d_input, input.c_str(), length * sizeof(unsigned char), cudaMemcpyHostToDevice);
+
+    sha256_cuda<<<1,1>>>(d_input, length, d_output);
+    cudaMemcpy(h_output, d_output, SHA256::DIGEST_SIZE * sizeof(unsigned char), cudaMemcpyHostToDevice);
+
+    cudaFree(d_input);
+    cudaFree(d_output);
+
+    std::stringstream ss;
+
+    for (int i = 0; i < SHA256::DIGEST_SIZE; ++i)
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)h_output[i];
+
+    return ss.str();
 }
