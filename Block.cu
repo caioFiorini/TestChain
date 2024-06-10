@@ -1,7 +1,8 @@
 #include "Block.cuh"
-#include "sha256.h"
+#include "sha256.cuh"
 
-__device__ bool Block::_IsValidHash(const char* hash, uint32_t nDifficulty) const {
+
+__device__ bool _IsValidHash(const char* hash, uint32_t nDifficulty) const {
     for (uint32_t i = 0; i < nDifficulty; ++i) {
         if (hash[i] != '0') {
             return false;
@@ -13,13 +14,20 @@ __device__ bool Block::_IsValidHash(const char* hash, uint32_t nDifficulty) cons
 __global__ void mineblock(uint32_t nDifficulty, uint32_t* nNonce, char* sHash, uint32_t index, time_t tTime, const char* sPrevHash, const char* sData) {
     uint32_t nonce = blockIdx.x * blockDim.x + threadIdx.x;
 
+    char buffer_ss[1000];
+
     char hash[65];
     while (true) {
         // Calculate hash
-        stringstream ss;
-        ss << index << sPrevHash << tTime << sData << nonce;
-        string hashString = sha256(ss.str());
-        strncpy(hash, hashString.c_str(), 64);
+        sprintf(buffer_ss, "%d%s%ld%s%d", index, sPrevHash, tTime, sData, nonce);
+        
+        sha256(buffer_ss, hash);
+
+        for (int i = 0; i < 64; i++)
+        {
+            sHash[i] = hash[i];
+        }
+
         hash[64] = '\0';
 
         if (_IsValidHash(hash, nDifficulty)) {

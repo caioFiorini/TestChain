@@ -15,8 +15,6 @@ class Block {
 
         Block (uint32_t nIndexIn, const string &sDataIn);
         void MineBlock(uint32_t nDifficulty);
-
-    private:
         uint32_t _nIndex;
         uint32_t* _nNonce;
         string _sData;

@@ -123,9 +123,9 @@ __global__ void sha256_cuda(const unsigned char *input, unsigned int length, uns
     ctx.final(output);
 }
 
-string sha256(string input)
+void sha256(char* input, char* hash)
 {
-    const unsigned int length = input.size();
+    const unsigned int length = strlen(input)+1;
     unsigned char *d_input, *d_output;
     unsigned char digest[SHA256::DIGEST_SIZE];
 
@@ -139,10 +139,6 @@ string sha256(string input)
     cudaFree(d_input);
     cudaFree(d_output);
 
-    std::stringstream ss;
-
     for (int i = 0; i < SHA256::DIGEST_SIZE; ++i)
-        ss << std::hex << std::setw(2) << std::setfill('0') << (int)h_output[i];
-
-    return ss.str();
+        sprintf(&hash[i*2], "%02x", h_output[i]);
 }
