@@ -1,38 +1,27 @@
 #ifndef SHA256_CUH
 #define SHA256_CUH
-#include <cuda_runtime.h>
-#include <cstring>
-#include <cstdio>
-#include <string>
-#include <sstream>
-#include <iomanip>
 
-using namespace std;
+#include <stdint.h>
 
-class SHA256{
-    protected:
-        typedef unsigned char uint8;
-        typedef unsigned int uint32;
-        typedef unsigned long long uint64;
+#define SHA224_256_BLOCK_SIZE  (512/8)
+#define SHA256_DIGEST_SIZE (256/8)
 
-        const static uint32 sha256_k[];
-        static const unsigned int SHA224_256_BLOCK_SIZE = (512/8);
-    
-    public:
-        __host__ void init();
-        __host__ void update(const unsigned char *message, unsigned int len);
-        __host__ void final(unsigned char *digest);
-        static const unsigned int DIGEST_SIZE = (256/8);
-
-    protected:
-        __device__ void transform(const unsigned char *message, unsigned int block_nb);
-        unsigned int m_tot_len;
-        unsigned int m_len;
-        unsigned char m_block[2*SHA224_256_BLOCK_SIZE];
-        uint32 m_h[8];
+class SHA256 {
+public:
+    char* SHA256();
+    __host__ void init();
+    __host__ void update(const unsigned char *message, unsigned int len);
+    __host__ void final(unsigned char *digest);
+    static const unsigned int sha256_k[];
+protected:
+    __device__ void transform(const unsigned char *message, unsigned int block_nb);
+    unsigned int m_tot_len;
+    unsigned int m_len;
+    unsigned char m_block[2*SHA224_256_BLOCK_SIZE];
+    uint32_t m_h[8];
 };
 
-string sha256(string input);
+char* sha256(char* input);
 
 #define SHA2_SHFR(x, n)    (x >> n)
 #define SHA2_ROTR(x, n)   ((x >> n) | (x << ((sizeof(x) << 3) - n)))
@@ -57,5 +46,4 @@ string sha256(string input);
            | ((uint32) *((str) + 1) << 16)    \
            | ((uint32) *((str) + 0) << 24);   \
 }
-
 #endif //SHA256_CUH
