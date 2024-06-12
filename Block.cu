@@ -13,7 +13,7 @@ __global__ void calculateHashKernel(char* sHash)
     sHash = b._CalculateHash();
 }
 
-Block::Block(uint32_t nIndexIn, const string &sDataIn) : _nIndex(nIndexIn), _sData(sDataIn)
+Block::Block(uint32_t nIndexIn, const string& sDataIn) : _nIndex(nIndexIn), _sData(sDataIn)
 {
     _nNonce = 0;
     _tTime = time(nullptr);
@@ -28,10 +28,13 @@ Block::Block(uint32_t nIndexIn, const string &sDataIn) : _nIndex(nIndexIn), _sDa
     cudaFree(d_sHash);
 }
 
-__device__ void Block::mineBlock(char *str, uint32_t nDifficulty)
+__global__ void Block::mineBlock(char *str, uint32_t nDifficulty)
 {
     (*_nNonce)++;
     sHash = _CalculateHash(); 
+
+    // for de 0 até nDifficulty
+    // salvar em um variável e joga para a comparação.
 
     if (sHash.substr(0, nDifficulty) != str) // std::string::substr não é suportado em CUDA
     {
@@ -44,7 +47,7 @@ __global__ void kernelMineBlock(char *d_str, uint32_t nDifficulty)
     mineBlock(d_nonce, d_hash, d_str, nDifficulty);
 }
 
-__host__ void Block::MineBlock(uint32_t nDifficulty)
+void Block::MineBlock(uint32_t nDifficulty)
 {
     char cstr[nDifficulty + 1];
     for (uint32_t i = 0; i < nDifficulty; ++i)
@@ -62,7 +65,7 @@ __host__ void Block::MineBlock(uint32_t nDifficulty)
     cudaFree(d_str);
 }
 
-__device__ void Block::concatenate(char* result)
+__global__ void Block::concatenate(char* result)
 {
     char _nIndex_str[12]; 
     sprintf(_nIndex_str, "%u", _nIndex);
@@ -78,10 +81,10 @@ __device__ void Block::concatenate(char* result)
     strcat(result, _nNonce_str);
 }
 
-__device__ inline char* Block::_CalculateHash()
+inline char* Block::_CalculateHash()
 {
     char* result;
     concatenate(result)
 
-    return sha256(result);
+    return SHA256CUDA::sha256(result);
 }
