@@ -1,54 +1,107 @@
 //
 // Created by Dave Nash on 20/10/2017.
 //
-
+#include <algorithm>
+#include <cstdio>
+#include <ctime>
+#include <cstring>
 #include "Block.cuh"
 #include "sha256.cuh"
-#include "string.h"
+#include "sha256host.cuh"
 
-__global__ void calculateHashKernel(char* sHash)
-{
-    // Chame a função _CalculateHash() aqui e armazene o resultado em sHash
-    Block* b;
-    sHash = b._CalculateHash();
-}
-
-Block::Block(uint32_t nIndexIn, const string& sDataIn) : _nIndex(nIndexIn), _sData(sDataIn)
+Block::Block(uint32_t nIndexIn, const std::string &sDataIn) : _nIndex(nIndexIn), _sData(sDataIn)
 {
     _nNonce = 0;
     _tTime = time(nullptr);
 
-    char* d_sHash;
-    cudaMalloc(&d_sHash, strlen(sHash));
-
-    calculateHashKernel<<<1,1>>>(d_sHash)
-
-    cudaMemcpy(sHash, d_sHash, strlen(sHash), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_sHash);
+    sHash = _CalculateHash();
 }
 
-__global__ void Block::mineBlock(char *str, uint32_t nDifficulty)
+__device__ int strcmp_cuda(const char *str1, const char *str2)
 {
-    (*_nNonce)++;
-    sHash = _CalculateHash(); 
+    while (*str1 && (*str1 == *str2))
+    {
+        str1++;
+        str2++;
+    }
+    return *(unsigned char *)str1 - *(unsigned char *)str2;
+}
 
-    // for de 0 até nDifficulty
-    // salvar em um variável e joga para a comparação.
+__device__ char* uint32_to_string(uint32_t num, char* buffer)
+{
+    int i = 0;
+    do
+    {
+        buffer[i++] = '0' + (num % 10);
+        num /= 10;
+    } while (num > 0);
+    buffer[i] = '\0';
+    
+    // Reverse the string
+    for (int j = 0; j < i / 2; j++)
+    {
+        char temp = buffer[j];
+        buffer[j] = buffer[i - j - 1];
+        buffer[i - j - 1] = temp;
+    }
+    return buffer;
+}
 
-    if (sHash.substr(0, nDifficulty) != str) // std::string::substr não é suportado em CUDA
+__device__ char* int64_to_string(int64_t num, char* buffer)
+{
+    int i = 0;
+    bool isNegative = num < 0;
+    if (isNegative) num = -num;
+
+    do
+    {
+        buffer[i++] = '0' + (num % 10);
+        num /= 10;
+    } while (num > 0);
+    
+    if (isNegative) buffer[i++] = '-';
+    buffer[i] = '\0';
+
+    for (int j = 0; j < i / 2; j++)
+    {
+        char temp = buffer[j];
+        buffer[j] = buffer[i - j - 1];
+        buffer[i - j - 1] = temp;
+    }
+    return buffer;
+}
+
+__device__ void strcpy_cuda(char* dest, const char* src)
+{
+    while ((*dest++ = *src++) != '\0');
+}
+
+__device__ void strcat_cuda(char* dest, const char* src)
+{
+    while (*dest) dest++;
+    while ((*dest++ = *src++) != '\0');
+}
+
+__global__ void mineBlockKernel(Block *b, char *str, uint32_t nDifficulty, char *resp)
+{
+    b->_nNonce++;
+    char *sHash = b->_CalculateHashCuda();
+
+    for (int i = 0; i < nDifficulty; i++)
+    {
+        resp[i] = sHash[i];
+    }
+    resp[nDifficulty] = '\0';
+
+    if (strcmp_cuda(resp, str) == 0)
     {
         printf("Block mined: %s\n", sHash);
     }
 }
 
-__global__ void kernelMineBlock(char *d_str, uint32_t nDifficulty)
-{
-    mineBlock(d_nonce, d_hash, d_str, nDifficulty);
-}
-
 void Block::MineBlock(uint32_t nDifficulty)
 {
+    Block *b = this;
     char cstr[nDifficulty + 1];
     for (uint32_t i = 0; i < nDifficulty; ++i)
     {
@@ -57,34 +110,41 @@ void Block::MineBlock(uint32_t nDifficulty)
     cstr[nDifficulty] = '\0';
 
     char *d_str;
+    char *d_resp;
     cudaMalloc(&d_str, sizeof(cstr));
+    cudaMalloc(&d_resp, nDifficulty + 1);
     cudaMemcpy(d_str, cstr, sizeof(cstr), cudaMemcpyHostToDevice);
 
-    kernelMineBlock<<<1, 1>>>(d_str, nDifficulty);
+    mineBlockKernel<<<1, 1>>>(b, d_str, nDifficulty, d_resp);
 
     cudaFree(d_str);
+    cudaFree(d_resp);
 }
 
-__global__ void Block::concatenate(char* result)
+__device__ inline char* Block::_CalculateHashCuda()
 {
-    char _nIndex_str[12]; 
-    sprintf(_nIndex_str, "%u", _nIndex);
+    char result[1024]; // Supondo que o tamanho máximo do hash seja 1024 caracteres
+
+    char _nIndex_str[12];
+    uint32_to_string(_nIndex, _nIndex_str);
 
     char _tTime_str[20];
-    sprintf(_tTime_str, "%lld", (long long) _tTime);
+    int64_to_string(_tTime, _tTime_str);
 
     char _nNonce_str[12];
-    sprintf(_nNonce_str, "%u", _nNonce);
+    uint32_to_string(_nNonce, _nNonce_str);
 
-    strcpy(result, _nIndex_str);
-    strcat(result, _tTime_str);
-    strcat(result, _nNonce_str);
-}
-
-inline char* Block::_CalculateHash()
-{
-    char* result;
-    concatenate(result)
+    strcpy_cuda(result, _nIndex_str);
+    strcat_cuda(result, _tTime_str);
+    strcat_cuda(result, _nNonce_str);
 
     return SHA256CUDA::sha256(result);
+}
+
+inline std::string Block::_CalculateHash()
+{
+    std::stringstream ss;
+    ss << _nIndex << sPrevHash << _tTime << _sData << _nNonce;
+
+    return sha256(ss.str());
 }

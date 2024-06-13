@@ -17,7 +17,7 @@ void Blockchain::AddBlock(Block bNew)
     _vChain.push_back(bNew);
 }
 
-Block* Blockchain::_GetLastBlock()
+Block* Blockchain::_GetLastBlock() const
 {
     return _vChain.back();
 }

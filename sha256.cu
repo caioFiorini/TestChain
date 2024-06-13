@@ -1,6 +1,6 @@
 #include <cstring>
 #include <fstream>
-#include "sha256Host.cuh"
+#include "sha256host.cuh"
 #include <iostream>
 
 const unsigned int SHA256::sha256_k[64] = //UL = uint32
@@ -118,16 +118,16 @@ void SHA256::final(unsigned char* digest)
 std::string sha256(std::string input)
 {
     unsigned char digest[SHA256::DIGEST_SIZE];
-    memset(digest, 0, SHA256::DIGEST_SIZE);
+    memset(digest,0,SHA256::DIGEST_SIZE);
 
     SHA256 ctx = SHA256();
     ctx.init();
-    ctx.update((unsigned char*)input.c_str(), input.length());
+    ctx.update( (unsigned char*)input.c_str(), input.length());
     ctx.final(digest);
 
-    char buf[2 * SHA256::DIGEST_SIZE + 1];
-    buf[2 * SHA256::DIGEST_SIZE] = 0;
+    char buf[2*SHA256::DIGEST_SIZE+1];
+    buf[2*SHA256::DIGEST_SIZE] = 0;
     for (int i = 0; i < SHA256::DIGEST_SIZE; i++)
-        sprintf(buf + i * 2, "%02x", digest[i]);
+        sprintf(buf+i*2, "%02x", digest[i]);
     return std::string(buf);
 }
